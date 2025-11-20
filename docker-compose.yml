@@ -1,0 +1,48 @@
+services:
+  # Flask Dashboard
+  dashboard:
+    build: .
+    container_name: steam-dashboard
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=8080
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+    volumes:
+      - steam_data:/app/data
+    depends_on:
+      - producer
+    restart: unless-stopped
+    networks:
+      - steam-network
+    command: python src/dashboard/app.py
+
+  # Steam Data Producer
+  producer:
+    build: .
+    container_name: steam-producer
+    environment:
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+    volumes:
+      - steam_data:/app/data
+      - ./config:/app/config:ro
+    restart: unless-stopped
+    networks:
+      - steam-network
+    command: >
+      sh -c "
+      echo 'Waiting for dashboard to start...' &&
+      sleep 10 &&
+      python src/steam_producer.py 
+      --watchlist config/games_watchlist.json 
+      --interval 120
+      "
+
+volumes:
+  steam_data:
+    driver: local
+
+networks:
+  steam-network:
+    driver: bridge
